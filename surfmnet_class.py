@@ -8,11 +8,6 @@ Created on Sat Apr 11 21:16:02 2020
 import os
 import sys
 import tensorflow as tf
-BASE_DIR = os.path.dirname(__file__)
-sys.path.append(BASE_DIR)
-sys.path.append(os.path.join(BASE_DIR, '../utils'))
-
-from pointnet_util import pointnet_sa_module, pointnet_fp_module
 
 #using global functions inside a class..you can just use them as such.
 class surfmnet:
