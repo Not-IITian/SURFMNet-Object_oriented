@@ -19,28 +19,26 @@ from surfmnet_class import *
 
 flags = tf.app.flags
 FLAGS = flags.FLAGS
+
 # Training parameterss
 flags.DEFINE_float('learning_rate', 1e-4, 'initial learning rate.')
 flags.DEFINE_integer('batch_size', 4, 'batch size.')
 # Architecture parameters
-flags.DEFINE_integer('num_fclayers', 2, 'network depth') 
+flags.DEFINE_integer('num_fclayers', 4, 'network depth') 
 flags.DEFINE_integer('num_evecs', 30, "number of eigenvectors used for representation")
 # Data parameters
-flags.DEFINE_string('targets_dir', '../../Unsupervised_FMnet/Shapes/Surreal_nicolas/MAT/','directory with shapes')  
-flags.DEFINE_string('feat_dir', '../../Unsupervised_FMnet/Shapes/Surreal_nicolas/MAT/','directory with shapes')  
-flags.DEFINE_string('files_name', 'surreal_', 'name common to all the shapes')
+flags.DEFINE_string('targets_dir', 'Shapes/FAUST_r/MAT_SHOT/','directory with shapes')  
+flags.DEFINE_string('files_name', '', 'name common to all the shapes')
 
-flags.DEFINE_string('targets_dir_te', '../../Unsupervised_FMnet/Shapes/Scape_r_aligned/MAT/','directory with shapes')  
-flags.DEFINE_string('feat_dir_te', '../../Unsupervised_FMnet/Shapes/Scape_r_aligned/scape_mat/','directory with shapes')  
-flags.DEFINE_string('files_name_te', '', 'name common to all the shapes')
+#flags.DEFINE_string('targets_dir_te', '../../Unsupervised_FMnet/Shapes/Scape_r_aligned/MAT/','directory with shapes')  
 
 flags.DEFINE_integer('max_train_iter', 12000, '')
-flags.DEFINE_integer('num_vertices', 4000, '') 
+flags.DEFINE_integer('num_vertices', 3000, '') 
 flags.DEFINE_integer('save_summaries_secs', 500, '') 
 flags.DEFINE_integer('save_model_secs', 500, '')
-flags.DEFINE_string('log_dir_', 'Training/SCAPE_r_aligned/pointnet_fmnet_b4_lr_-4_30evec_del-0_4k_2fc_aligned_tr-Sur_50_dm/',
+flags.DEFINE_string('log_dir_', 'Training/SCAPE_r_aligned/_30_dm/',
                     'directory to save models and results')
-flags.DEFINE_string('matches_dir', 'Matches/SCAPE_r_aligned/pointnet_fmnet_b4_lr_-4_30evec_del-0_4k_2fc_aligned_tr_Sur_50_dm/',
+flags.DEFINE_string('matches_dir', 'Matches/SCAPE_r_aligned/30_dm/',
                     'directory to matches')
 flags.DEFINE_integer('dim_', 128,'')
 flags.DEFINE_integer('decay_step', 200000, help='Decay step for lr decay [default: 200000]')
@@ -58,23 +56,15 @@ flags.DEFINE_list('dims', [dim_,dim_,dim_,dim_, dim_, dim_, dim_], '')
 #last_layer = int(FLAGS.dims[no_layers-1])
 #flags.DEFINE_integer('dim_out', last_layer, '') 
 	
-vert_dir = FLAGS.feat_dir
-vert_dir_te = FLAGS.feat_dir_te
-n_tr = 50
-train_subjects,test_subjects = (range(50),range(60,70))
+n_tr = 80
+train_subjects,test_subjects = (range(80),range(80,100))
 #train_subjects = list(range(n_tr)) + list(range(52,60))
 #test_subjects = range(60,70)
 main_dir = FLAGS.targets_dir
 files_name =FLAGS.files_name
-main_dir_te = FLAGS.targets_dir_te
-files_name_te =FLAGS.files_name_te
+main_dir_te = FLAGS.targets_dir
+files_name_te =FLAGS.files_name
  
-DECAY_STEP = FLAGS.decay_step
-DECAY_RATE = FLAGS.decay_rate 
-BN_INIT_DECAY = 0.5
-BN_DECAY_DECAY_RATE = 0.5
-BN_DECAY_DECAY_STEP = float(DECAY_STEP)
-BN_DECAY_CLIP = 0.99 
 BATCH_SIZE = FLAGS.batch_size
 	
 SURFMNetConfig = {
@@ -95,8 +85,8 @@ def get_input_pair(batch_size, num_vertices, dataset):
         'target_evecs': np.zeros((batch_size, num_vertices, FLAGS.num_evecs)),
         'source_evecs_trans': np.zeros((batch_size,FLAGS.num_evecs,num_vertices)),
         'target_evecs_trans': np.zeros((batch_size,FLAGS.num_evecs,num_vertices)),
-        'source_shot': np.zeros((batch_size, num_vertices, 3)),
-        'target_shot': np.zeros((batch_size, num_vertices, 3)),
+        'source_shot': np.zeros((batch_size, num_vertices, 352)),
+        'target_shot': np.zeros((batch_size, num_vertices, 352)),
         'source_evals': np.zeros((batch_size, FLAGS.num_evecs)),
         'target_evals': np.zeros((batch_size, FLAGS.num_evecs))
                    }       
@@ -197,17 +187,17 @@ def get_pair_from_ram(i_target, i_source, dataset):
 def load_targets_to_ram():
     global targets_train,targets_test
     targets_train,targets_test = ({},{})    
-    targets_train = load_subs(train_subjects, main_dir, vert_dir,files_name)
-    targets_test= load_subs(test_subjects,main_dir_te, vert_dir_te,files_name_te)
+    targets_train = load_subs(train_subjects, main_dir,files_name)
+    targets_test= load_subs(test_subjects,main_dir_te, files_name_te)
 
     
-def load_subs(subjects_list, dir_name,v_dir,f_name): 
+def load_subs(subjects_list, dir_name,f_name): 
     targets = {}
     
     for i_target in subjects_list:             
         target_file = dir_name +f_name +'%.4d.mat' % (i_target)
         #print(target_file)
-        vert_file = v_dir +f_name +'%.4d.mat' % (i_target)   
+        #vert_file = v_dir +f_name +'%.4d.mat' % (i_target)   
         input_data = sio.loadmat(target_file)        
         evecs = input_data['target_evecs'][:, 0:FLAGS.num_evecs]
         evecs_trans = input_data['target_evecs_trans'][0:FLAGS.num_evecs,:]
@@ -215,24 +205,14 @@ def load_subs(subjects_list, dir_name,v_dir,f_name):
         input_data['target_evecs'] = evecs
         input_data['target_evecs_trans'] = evecs_trans
         input_data['target_evals'] = evals 
-        p_feat = sio.loadmat(vert_file)
-        input_data['target_shot'] =[]        
-        input_data['target_shot'] = p_feat['VERT']             
+        #p_feat = sio.loadmat(vert_file)
+        #input_data['target_shot'] =[]        
+        #input_data['target_shot'] = p_feat['VERT']             
         targets[i_target] = input_data        
     return targets
 
-def get_bn_decay(batch):    
-    bn_momentum = tf.train.exponential_decay(
-                      BN_INIT_DECAY,
-                      batch*BATCH_SIZE,
-                      BN_DECAY_DECAY_STEP,
-                      BN_DECAY_DECAY_RATE,
-                      staircase=True)
-    bn_decay = tf.minimum(BN_DECAY_CLIP, 1 - bn_momentum)
-    return bn_decay 
 
-
-       
+      
 def run_training():
     
     print('log_dir=%s' % FLAGS.log_dir_)
@@ -246,9 +226,6 @@ def run_training():
     
     with tf.Graph().as_default():
         
-        batch = tf.Variable(0)
-        bn_decay = get_bn_decay(batch)
-		
         global_step = tf.Variable(0, name='global_step', trainable=False)
             #optimizer = tf.train.AdamOptimizer(FLAGS.learning_rate)
             #train_op = optimizer.minimize(net_loss,global_step=global_step, aggregation_method=2)
@@ -278,14 +255,13 @@ def run_training():
                                            our_model.source_evecs: input_data['source_evecs'], our_model.source_evecs_trans: input_data['source_evecs_trans'],
                     our_model.source_evals: input_data['source_evals'], our_model.target_evecs: input_data['target_evecs'],
                     our_model.target_evecs_trans: input_data['target_evecs_trans'], our_model.target_evals: input_data['target_evals'], our_model.phase:True})
-         
-                
+                         
                 duration = time.time() - start_time
                 print('train -: loss = %.2f (%.3f sec)'% ( cost_val, duration))
                 
                 if iteration%2000==0:                    
-                    for i_source in range(60,69):     
-                        for i_target in range(i_source+1,70):
+                    for i_source in range(80,99):     
+                        for i_target in range(i_source+1,100):
                             
                             t = time.time()
                             
@@ -293,19 +269,13 @@ def run_training():
                             source_evecs_ = input_data['source_evecs'][:, 0:FLAGS.num_evecs]
                             target_evecs_ = input_data['target_evecs'][:, 0:FLAGS.num_evecs]
         
-                            feed_dict = {
-                                phase: False,
-                                source_shot: [input_data['source_shot']],
-                                target_shot: [input_data['target_shot']],
-                                source_evecs: [input_data['source_evecs']],
-                                source_evecs_trans: [input_data['source_evecs_trans']],
-                                source_evals: [input_data['source_evals']],
-                                target_evecs: [input_data['target_evecs']],
-                                target_evecs_trans: [input_data['target_evecs_trans']],
-                                target_evals: [input_data['target_evals']]
-                                }
+                            feed_dict = {our_model_te.pc_s: input_data['source_shot'],our_model.pc_t: input_data['target_shot'], \
+                                           our_model.source_evecs: input_data['source_evecs'], our_model.source_evecs_trans: input_data['source_evecs_trans'],
+                    our_model.source_evals: input_data['source_evals'], our_model.target_evecs: input_data['target_evecs'],
+                    our_model.target_evecs_trans: input_data['target_evecs_trans'], our_model.target_evals: input_data['target_evals'], our_model.phase:False}
+         
                 
-                            C_est_ = sess.run([C], feed_dict=feed_dict)                            
+                            _, C_est_ = sess.run([optimizer,our_model.C_est_AB], feed_dict=feed_dict)                            
                             Ct = np.squeeze(C_est_).T #Keep transposed
                 
                             kdt = cKDTree(np.matmul(source_evecs_, Ct))

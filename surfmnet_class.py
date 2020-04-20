@@ -13,8 +13,8 @@ import tensorflow as tf
 class surfmnet:
     def __init__(self, SURFMNetConfig):
         self.num_evecs = SURFMNetConfig["num_evecs"]
-        self.pc_s = tf.placeholder(tf.float32,shape=(None, None, 3))
-        self.pc_t = tf.placeholder(tf.float32,shape=(None, None, 3))
+        self.pc_s = tf.placeholder(tf.float32,shape=(None, None, 352))
+        self.pc_t = tf.placeholder(tf.float32,shape=(None, None, 352))
         self.source_evecs = tf.placeholder(tf.float32, shape=(None, None, self.num_evecs))
         self.source_evecs_trans = tf.placeholder(tf.float32,shape=(None, self.num_evecs, None))
         self.source_evals = tf.placeholder(tf.float32,shape=(None, self.num_evecs))
@@ -26,15 +26,12 @@ class surfmnet:
         self.pc_size = SURFMNetConfig["pc_size"]
         self.dims = SURFMNetConfig["dims"]
         self.num_fclayers = SURFMNetConfig['num_fclayers']
-        batch = tf.Variable(0)
-        #self.bn_decay = get_bn_decay(batch)
+        self.dim_shot = SURFMNetConfig['dim_shot']
         with tf.variable_scope('siamese') as scope:
             o1 = self.model(self.pc_s)
             scope.reuse_variables()
             o2 = self.model(self.pc_t)
-                  
-        
-        
+                         
         self.C_est_AB = self.solve_ls(o1,o2)
         self.C_est_BA = self.solve_ls(o2,o1)
         self.cost = self.func_map_layer()
@@ -73,7 +70,7 @@ class surfmnet:
   
     def model(self,pc_1):
     #source_evecs, source_evecs_trans, source_evals, target_evecs, target_evecs_trans, target_evals, bn_decay=None):
-        dims=self.dims
+        dim_shot =self.dim_shot
         """ Semantic segmentation PointNet, input is BxNx3, output Bxnum_class """        
         phase= self.phase
         
@@ -81,9 +78,9 @@ class surfmnet:
         for i_layer in range(self.num_fclayers):
             with tf.variable_scope("layer_%d" % i_layer) as scope:
                 if i_layer == 0:
-                    net['fclayer_%d' % i_layer] = self.res_layer(pc_1, dims_out = 128, scope= scope,phase= phase)
+                    net['fclayer_%d' % i_layer] = self.res_layer(pc_1, dims_out = int(pc_1.shape[-1]), scope= scope,phase= phase)
                 else:
-                    net['fclayer_%d' % i_layer] = self.res_layer(net['fclayer_%d' % (i_layer-1)], dims_out = int(dims[i_layer]),scope= scope, phase= phase)
+                    net['fclayer_%d' % i_layer] = self.res_layer(net['fclayer_%d' % (i_layer-1)], dims_out = int(self.dims[i_layer]),scope= scope, phase= phase)
                                            
         #  Project output features on the shape Laplacian eigen functions
         
